@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: diploma-app
+  labels:
+    app: diploma-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: diploma-app
+  template:
+    metadata:
+      labels:
+        app: diploma-app
+    spec:
+      # ВАЖНО: Добавляем ссылку на секрет с паролем от реестра
+      imagePullSecrets:
+        - name: yc-cr-secret
+      containers:
+        - name: nginx
+          image: cr.yandex/crpa1aomffv6p6pm2trt/app:v1.0.0
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "128Mi"
+              cpu: "100m"

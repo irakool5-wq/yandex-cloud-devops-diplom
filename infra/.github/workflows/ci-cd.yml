@@ -1,0 +1,68 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  YC_SA_KEY: ${{ secrets.YC_SA_KEY }}
+  YC_FOLDER_ID: ${{ secrets.YC_FOLDER_ID }}
+  YC_REGISTRY_ID: ${{ secrets.YC_REGISTRY_ID }}
+  YC_CLUSTER_ID: ${{ secrets.YC_CLUSTER_ID }}
+  IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Yandex Cloud CLI
+        run: curl -sSL https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash
+
+      - name: Add YC CLI to PATH
+        run: echo "$HOME/yandex-cloud/bin" >> $GITHUB_PATH
+
+      - name: Authorize in Yandex Cloud
+        run: |
+          echo "$YC_SA_KEY" > key.json
+          yc config profile create sa-profile
+          yc config set service-account-key key.json
+
+      - name: Configure Docker for Yandex Container Registry
+        run: yc container registry configure-docker
+
+      - name: Build Docker image
+        run: docker build --platform linux/amd64 --provenance=false --sbom=false -t cr.yandex/$YC_REGISTRY_ID/app:$IMAGE_TAG app/
+
+      - name: Push Docker image
+        run: docker push cr.yandex/$YC_REGISTRY_ID/app:$IMAGE_TAG
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Yandex Cloud CLI
+        run: curl -sSL https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash
+
+      - name: Add YC CLI to PATH
+        run: echo "$HOME/yandex-cloud/bin" >> $GITHUB_PATH
+
+      - name: Authorize in Yandex Cloud
+        run: |
+          echo "$YC_SA_KEY" > key.json
+          yc config profile create sa-profile
+          yc config set service-account-key key.json
+
+      - name: Get K8s credentials
+        run: yc managed-kubernetes cluster get-credentials --id $YC_CLUSTER_ID --external --force
+
+      - name: Update image tag in deployment manifest
+        run: |
+          sed -i "s|image: cr.yandex/.*/app:.*|image: cr.yandex/$YC_REGISTRY_ID/app:$IMAGE_TAG|g" k8s/app/deployment.yaml
+
+      - name: Deploy to Kubernetes
+        run: kubectl apply -f k8s/app/
