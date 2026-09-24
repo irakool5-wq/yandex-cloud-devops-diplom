@@ -68,12 +68,23 @@ jobs:
           chmod 600 ~/.ssh/bastion_key
           
           # Получаем внутренний IP мастера Kubernetes
-          MASTER_IP=$(yc managed-kubernetes cluster get --id $YC_CLUSTER_ID --format json | jq -r '.master[0].internal_v4_address')
+          CLUSTER_INFO=$(yc managed-kubernetes cluster get --id $YC_CLUSTER_ID --format json)
+          echo "Cluster info: $CLUSTER_INFO" | jq .
+          
+          MASTER_IP=$(echo "$CLUSTER_INFO" | jq -r '.master.internal_v4_address')
+          echo "Master IP: $MASTER_IP"
+          
+          if [ -z "$MASTER_IP" ] || [ "$MASTER_IP" = "null" ]; then
+            echo "ERROR: Could not get master internal IP"
+            exit 1
+          fi
+          
           echo "Connecting to Master at $MASTER_IP via Bastion ${{ secrets.BASTION_IP }}"
           
-          # Запускаем SSH-туннель в фоновом режиме: локальный 6443 -> Бастион -> Мастер:443
-          ssh -i ~/.ssh/bastion_key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -L 6443:$MASTER_IP:443 ${{ secrets.BASTION_USER }}@${{ secrets.BASTION_IP }} -N -f &
+          # Запускаем SSH-туннель в фоновом режиме
+          ssh -i ~/.ssh/bastion_key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -L 6443:$MASTER_IP:443 ${{ secrets.BASTION_USER }}@${{ secrets.BASTION_IP }} -N -f
           sleep 5
+          echo "SSH tunnel established"
 
       - name: Get K8s credentials and fix endpoint
         run: |
@@ -81,6 +92,7 @@ jobs:
           yc managed-kubernetes cluster get-credentials --id $YC_CLUSTER_ID --internal --force
           # Подменяем адрес сервера на локальный конец туннеля
           sed -i 's|server: https://.*|server: https://127.0.0.1:6443|' ~/.kube/config
+          echo "Kubeconfig updated to use tunnel"
 
       - name: Update image tag in deployment manifest
         run: |
