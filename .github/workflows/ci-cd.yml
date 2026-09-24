@@ -52,6 +52,7 @@ jobs:
       - name: Get K8s credentials
         run: yc managed-kubernetes cluster get-credentials --id $YC_CLUSTER_ID --external --force
       - name: Update image tag in deployment manifest
-        run: sed -i "s|image: cr.yandex/.*/app:.*|image: cr.yandex/$YC_REGISTRY_ID/app:$IMAGE_TAG|g" k8s/app/deployment.yaml
+        run: |
+            sed -i "s|image: cr.yandex/.*/app:.*|image: cr.yandex/${{ env.YC_REGISTRY_ID }}/app:${{ env.IMAGE_TAG }}|g" k8s/app/deployment.yaml
       - name: Deploy to Kubernetes
         run: kubectl apply -f k8s/app/
