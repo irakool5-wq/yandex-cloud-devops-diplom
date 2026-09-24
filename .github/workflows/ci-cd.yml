@@ -47,10 +47,8 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Install Yandex Cloud CLI and jq
-        run: |
-          curl -sSL https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash
-          sudo apt-get update && sudo apt-get install -y jq
+      - name: Install Yandex Cloud CLI
+        run: curl -sSL https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash
 
       - name: Add YC CLI to PATH
         run: echo "$HOME/yandex-cloud/bin" >> $GITHUB_PATH
@@ -61,38 +59,51 @@ jobs:
           yc config profile create sa-profile
           yc config set service-account-key key.json
 
+      - name: Get K8s credentials and extract internal Master IP
+        run: |
+          # Получаем конфиг для внутреннего доступа (он создаст файл ~/.kube/config)
+          yc managed-kubernetes cluster get-credentials --id $YC_CLUSTER_ID --internal --force
+          
+          # Извлекаем внутренний IP мастера из сгенерированного kubeconfig
+          # Строка выглядит как: server: https://192.168.10.25:443
+          SERVER_URL=$(awk '/server:/ {print $2; exit}' ~/.kube/config)
+          MASTER_IP=$(echo $SERVER_URL | sed -e 's|https://||' -e 's|:.*||')
+          
+          echo "Extracted Master Internal IP: $MASTER_IP"
+          
+          if [ -z "$MASTER_IP" ]; then
+            echo "ERROR: Could not extract Master IP from kubeconfig"
+            exit 1
+          fi
+          
+          # Сохраняем IP в переменную окружения для следующего шага
+          echo "MASTER_IP=$MASTER_IP" >> $GITHUB_ENV
+
       - name: Setup SSH Tunnel to Private K8s Master
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.BASTION_SSH_KEY }}" > ~/.ssh/bastion_key
           chmod 600 ~/.ssh/bastion_key
           
-          # Получаем внутренний IP мастера Kubernetes
-          CLUSTER_INFO=$(yc managed-kubernetes cluster get --id $YC_CLUSTER_ID --format json)
-          echo "Cluster info: $CLUSTER_INFO" | jq .
+          echo "Setting up tunnel to $MASTER_IP via Bastion ${{ secrets.BASTION_IP }}"
           
-          MASTER_IP=$(echo "$CLUSTER_INFO" | jq -r '.master.internal_v4_address')
-          echo "Master IP: $MASTER_IP"
+          # Запускаем SSH-туннель в фоновом режиме: локальный 6443 -> Бастион -> Мастер:443
+          ssh -i ~/.ssh/bastion_key \
+              -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              -o ServerAliveInterval=60 \
+              -o ServerAliveCountMax=3 \
+              -L 6443:$MASTER_IP:443 \
+              ${{ secrets.BASTION_USER }}@${{ secrets.BASTION_IP }} -N -f &
           
-          if [ -z "$MASTER_IP" ] || [ "$MASTER_IP" = "null" ]; then
-            echo "ERROR: Could not get master internal IP"
-            exit 1
-          fi
-          
-          echo "Connecting to Master at $MASTER_IP via Bastion ${{ secrets.BASTION_IP }}"
-          
-          # Запускаем SSH-туннель в фоновом режиме
-          ssh -i ~/.ssh/bastion_key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -L 6443:$MASTER_IP:443 ${{ secrets.BASTION_USER }}@${{ secrets.BASTION_IP }} -N -f
           sleep 5
-          echo "SSH tunnel established"
+          echo "SSH tunnel established successfully"
 
-      - name: Get K8s credentials and fix endpoint
+      - name: Fix Kubeconfig to use local tunnel
         run: |
-          # Получаем конфиг для внутреннего доступа
-          yc managed-kubernetes cluster get-credentials --id $YC_CLUSTER_ID --internal --force
           # Подменяем адрес сервера на локальный конец туннеля
           sed -i 's|server: https://.*|server: https://127.0.0.1:6443|' ~/.kube/config
-          echo "Kubeconfig updated to use tunnel"
+          echo "Kubeconfig updated to use tunnel at 127.0.0.1:6443"
 
       - name: Update image tag in deployment manifest
         run: |
