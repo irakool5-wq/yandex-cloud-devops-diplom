@@ -4,13 +4,15 @@ on:
   push:
     branches:
       - main
+    tags:
+      - 'v*'
 
 env:
   YC_SA_KEY: ${{ secrets.YC_SA_KEY }}
   YC_FOLDER_ID: ${{ secrets.YC_FOLDER_ID }}
   YC_REGISTRY_ID: ${{ secrets.YC_REGISTRY_ID }}
   YC_CLUSTER_ID: ${{ secrets.YC_CLUSTER_ID }}
-  IMAGE_TAG: ${{ github.sha }}
+  IMAGE_TAG: ${{ github.ref_name == 'main' && github.sha || github.ref_name }}
 
 jobs:
   build-and-push:
@@ -45,8 +47,10 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Install Yandex Cloud CLI
-        run: curl -sSL https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash
+      - name: Install Yandex Cloud CLI and jq
+        run: |
+          curl -sSL https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash
+          sudo apt-get update && sudo apt-get install -y jq
 
       - name: Add YC CLI to PATH
         run: echo "$HOME/yandex-cloud/bin" >> $GITHUB_PATH
@@ -57,8 +61,26 @@ jobs:
           yc config profile create sa-profile
           yc config set service-account-key key.json
 
-      - name: Get K8s credentials
-        run: yc managed-kubernetes cluster get-credentials --id $YC_CLUSTER_ID --external --force
+      - name: Setup SSH Tunnel to Private K8s Master
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.BASTION_SSH_KEY }}" > ~/.ssh/bastion_key
+          chmod 600 ~/.ssh/bastion_key
+          
+          # Получаем внутренний IP мастера Kubernetes
+          MASTER_IP=$(yc managed-kubernetes cluster get --id $YC_CLUSTER_ID --format json | jq -r '.master[0].internal_v4_address')
+          echo "Connecting to Master at $MASTER_IP via Bastion ${{ secrets.BASTION_IP }}"
+          
+          # Запускаем SSH-туннель в фоновом режиме: локальный 6443 -> Бастион -> Мастер:443
+          ssh -i ~/.ssh/bastion_key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -L 6443:$MASTER_IP:443 ${{ secrets.BASTION_USER }}@${{ secrets.BASTION_IP }} -N -f &
+          sleep 5
+
+      - name: Get K8s credentials and fix endpoint
+        run: |
+          # Получаем конфиг для внутреннего доступа
+          yc managed-kubernetes cluster get-credentials --id $YC_CLUSTER_ID --internal --force
+          # Подменяем адрес сервера на локальный конец туннеля
+          sed -i 's|server: https://.*|server: https://127.0.0.1:6443|' ~/.kube/config
 
       - name: Update image tag in deployment manifest
         run: |

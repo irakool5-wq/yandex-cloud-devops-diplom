@@ -12,7 +12,7 @@ resource "yandex_kubernetes_cluster" "diploma_k8s" {
       zone      = var.zones[0]
       subnet_id = yandex_vpc_subnet.public[var.zones[0]].id
     }
-    public_ip = true
+    public_ip = false
   }
 
   service_account_id      = local.sa_id
@@ -47,7 +47,7 @@ resource "yandex_kubernetes_node_group" "diploma_k8s_ng" {
         yandex_vpc_subnet.public[var.zones[1]].id,
         yandex_vpc_subnet.public[var.zones[2]].id
       ]
-      nat = true # <--- ВОТ ЭТО ИСПРАВЛЯЕТ ДОСТУП В ИНТЕРНЕТ
+      nat = false
     }
   }
 
