@@ -12,7 +12,7 @@ resource "yandex_kubernetes_cluster" "diploma_k8s" {
       zone      = var.zones[0]
       subnet_id = yandex_vpc_subnet.public[var.zones[0]].id
     }
-    public_ip = false
+    public_ip = true
   }
 
   service_account_id      = local.sa_id
