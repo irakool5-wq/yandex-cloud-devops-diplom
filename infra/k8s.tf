@@ -47,7 +47,7 @@ resource "yandex_kubernetes_node_group" "diploma_k8s_ng" {
         yandex_vpc_subnet.public[var.zones[1]].id,
         yandex_vpc_subnet.public[var.zones[2]].id
       ]
-      nat = false
+      nat = true
     }
   }
 
