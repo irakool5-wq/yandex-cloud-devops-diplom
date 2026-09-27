@@ -268,6 +268,7 @@ terraform {
 app/
 ├── Dockerfile
 └── index.html
+```
 
 **Dockerfile:**
 
@@ -276,6 +277,7 @@ FROM nginx:alpine
 COPY index.html /usr/share/nginx/html/index.html
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
+```
 
 
 **index.html:**  
@@ -310,7 +312,7 @@ helm install prometheus prometheus-community/kube-prometheus-stack \
   --set grafana.service.type=LoadBalancer \
   --set grafana.service.port=80 \
   --set grafana.adminPassword=admin
-
+```
 
 > 💡 **Архитектурное решение:** Сервис Grafana настроен как `LoadBalancer` на порту `80`, что полностью удовлетворяет требованию методички о HTTP-доступе без необходимости использования SSH-туннелей.
 
