@@ -240,6 +240,7 @@ terraform {
 - [x] В файле `~/.kube/config` находятся данные для доступа.
 - [x] Команда `kubectl get nodes` отрабатывает без ошибок, показывая 2 узла в статусе `Ready`.
 
+---
 
 <img width="1235" height="174" alt="Скриншот 27-09-2026 145721" src="https://github.com/user-attachments/assets/014b2368-5e74-45a9-a477-c898cf8a41ef" />
 
