@@ -140,3 +140,244 @@
 5. Репозиторий с конфигурацией Kubernetes кластера.
 6. Ссылка на тестовое приложение и веб интерфейс Grafana с данными доступа.
 7. Все репозитории рекомендуется хранить на одном ресурсе (github, gitlab)
+
+---
+
+
+
+#  Дипломный практикум в Yandex.Cloud
+
+**Автор:** Алавидзе И.Г.  
+**Дата:** Сентябрь 2026  
+**Облачный провайдер:** Yandex Cloud  
+**Репозиторий:** [github.com/irakool5-wq/yandex-cloud-devops-diplom](https://github.com/irakool5-wq/yandex-cloud-devops-diplom)
+
+---
+
+## 1. Создание облачной инфраструктуры
+
+**Цель этапа:**  
+Первичная подготовка облачной среды в Yandex Cloud для дальнейшего развертывания инфраструктуры с использованием Terraform (Infrastructure as Code).
+
+**Используемые инструменты:**
+- **Terraform** — инструмент управления инфраструктурой как кодом (IaC).
+- **Yandex Cloud CLI (`yc`)** — инструмент управления облаком.
+- **Yandex Cloud IAM** — система управления доступом.
+- **Yandex Object Storage** — для хранения state-файла Terraform (S3 backend).
+
+**Описание реализованной инфраструктуры:**  
+Проект разделен на две логические директории для соблюдения принципа разделения ответственности:
+- `setup/` — создание сервисного аккаунта и S3-бакета для хранения стейта.
+- `infra/` — основная инфраструктура (VPC, подсети, Kubernetes, Registry, Bastion).
+
+### 1.1. Сервисный аккаунт и IAM
+Создан сервисный аккаунт `terraform`.
+
+### 1.2. Конфигурация Backend
+Для хранения состояния Terraform настроен S3-совместимый backend в файле `infra/backend.tf`:
+```hcl
+terraform {
+  backend "s3" {
+    endpoint = "storage.yandexcloud.net"
+    bucket   = "alavidze-tf-state-b1gtud25o2pff6srffhu"
+    region   = "ru-central1"
+    key      = "terraform.tfstate"
+    
+    skip_region_validation      = true
+    skip_credentials_validation = true
+  }
+}
+
+
+### 1.3. Сетевая инфраструктура (VPC)
+
+Создана виртуальная сеть `alavidze-develop-24-01` с подсетями в трех зонах доступности для обеспечения отказоустойчивости:
+
+- **Публичные подсети:**
+  - `public-ru-central1-a`
+  - `public-ru-central1-b`
+  - `public-ru-central1-d`
+
+- **Приватные подсети:**
+  - `private-ru-central1-a`
+  - `private-ru-central1-b`
+  - `private-ru-central1-d`
+
+✅ **Результаты выполнения этапа:**
+
+- [x] Создан сервисный аккаунт `terraform`..
+- [x] Настроен S3 backend для хранения state-файла.
+- [x] Создана VPC с подсетями в 3 зонах доступности.
+- [x] Конфигурация позволяет выполнять `terraform apply` и `terraform destroy` без ручных вмешательств.
+
+
+## 2. Создание Kubernetes кластера
+
+**Цель этапа:**  
+Развернуть работоспособный Kubernetes кластер на базе предварительно созданной сетевой инфраструктуры с обеспечением доступа из Интернета.
+<img width="1235" height="174" alt="Скриншот 27-09-2026 145721" src="https://github.com/user-attachments/assets/2d346ed1-85f8-4d5a-b4a9-ecd6e57ade64" />
+<img width="1235" height="174" alt="Скриншот 27-09-2026 145721" src="https://github.com/user-attachments/assets/45f4b947-2055-425d-95a1-a5599682223c" />
+
+**Выбранный вариант:** Альтернативный (рекомендуемый методикой) — использование сервиса **Yandex Managed Service for Kubernetes**.
+
+**Используемые инструменты:**
+- **Terraform** (`yandex_kubernetes_cluster`, `yandex_kubernetes_node_group`)
+- **kubectl** — для управления кластером.
+
+### 2.1. Конфигурация кластера (`infra/k8s.tf`)
+
+Создан региональный мастер-кластер и группа узлов со следующими параметрами:
+
+- **Master:** Региональный, публичный IP-адрес включен.
+- **Node Group:** 2 прерываемые (preemptible) виртуальные машины для экономии бюджета.
+- **Платформа:** `standard-v3` (2 vCPU, 4 GB RAM на ноду).
+- **Распределение:** Узлы размещены в 3 разных подсетях (`ru-central1-a`, `ru-central1-b`, `ru-central1-d`).
+- **Сеть:** В конфигурации `network_interface` включен параметр `nat = true` для обеспечения прямого выхода узлов в Интернет (необходимо для скачивания образов из Docker Hub).
+
+✅ **Результаты выполнения этапа:**
+
+- [x] Работоспособный Managed Kubernetes кластер.
+- [x] В файле `~/.kube/config` находятся данные для доступа.
+- [x] Команда `kubectl get nodes` отрабатывает без ошибок, показывая 2 узла в статусе `Ready`.
+
+
+<img width="1235" height="174" alt="Скриншот 27-09-2026 145721" src="https://github.com/user-attachments/assets/014b2368-5e74-45a9-a477-c898cf8a41ef" />
+
+
+<img width="1548" height="771" alt="Скриншот 27-09-2026 165105" src="https://github.com/user-attachments/assets/aa41b0e1-7fd3-4d62-97b3-2d32a402d051" />
+
+
+
+
+## 3. Создание тестового приложения
+
+**Цель этапа:**  
+Подготовить тестовое приложение, упаковать его в Docker-образ и опубликовать в Yandex Container Registry.
+
+**Используемые инструменты:**
+- **Docker** — контейнеризация приложения.
+- **Git / GitHub** — хранение исходного кода и версионирование.
+- **Yandex Container Registry** — хранение Docker-образов (создан через Terraform).
+
+### 3.1. Структура и код
+
+В репозитории создана директория `app/` со следующей структурой:
+
+```text
+app/
+├── Dockerfile
+└── index.html
+
+**Dockerfile:**
+
+```dockerfile
+FROM nginx:alpine
+COPY index.html /usr/share/nginx/html/index.html
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
+
+
+**index.html:**  
+Содержит статическую страницу с текстом: *"Дипломный практикум в Yandex.Cloud / Алавидзе И.Г."*
+
+### ✅ Результаты выполнения этапа
+
+- ✅ Git-репозиторий содержит исходный код приложения и Dockerfile.
+- ✅ Образ успешно собирается и отправляется в Yandex Container Registry (`cr.yandex/<registry_id>/diploma-app`).
+
+
+## 4. Подготовка системы мониторинга и деплой приложения
+
+**Цель этапа:**  
+Задеплоить в кластер Prometheus, Grafana, Alertmanager, Node Exporter, а также развернуть тестовое приложение с HTTP-доступом на 80 порту.
+
+**Используемые инструменты:**
+- **Helm** — пакетный менеджер для Kubernetes.
+- **kube-prometheus-stack** (Prometheus Community) — готовый набор чартов для мониторинга.
+- **kubectl** — для управления кластером.
+
+### 4.1. Деплой системы мониторинга
+
+Использован готовый Helm-чарт, включающий все необходимые компоненты:
+
+```bash
+kubectl create namespace monitoring
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo update
+helm install prometheus prometheus-community/kube-prometheus-stack \
+  --namespace monitoring \
+  --set grafana.service.type=LoadBalancer \
+  --set grafana.service.port=80 \
+  --set grafana.adminPassword=admin
+
+
+> 💡 **Архитектурное решение:** Сервис Grafana настроен как `LoadBalancer` на порту `80`, что полностью удовлетворяет требованию методички о HTTP-доступе без необходимости использования SSH-туннелей.
+
+### 4.2. Деплой тестового приложения
+
+В директории `k8s/app/` созданы манифесты `deployment.yaml` и `service.yaml`. Сервис приложения также имеет тип `LoadBalancer` и слушает порт `80`.
+
+### ✅ Результаты выполнения этапа
+
+- ✅ Все поды в namespace `monitoring` находятся в статусе `Running`.
+- ✅ HTTP-доступ к веб-интерфейсу Grafana на 80 порту (логин: `admin`, пароль: `admin`).
+- ✅ Дашборд "Kubernetes / Compute Resources / Nodes" отображает реальные метрики CPU и памяти.
+- ✅ HTTP-доступ к тестовому приложению на 80 порту.
+
+
+
+<img width="1574" height="833" alt="Скриншот 27-09-2026 145546" src="https://github.com/user-attachments/assets/b8c3a7d1-f185-4a0a-926d-e63e60a462fb" />
+
+<img width="1805" height="761" alt="Скриншот 27-09-2026 145333" src="https://github.com/user-attachments/assets/7634dc58-9bbb-4ba7-b80d-4f82ea75ea28" />
+
+
+## 5. Установка и настройка CI/CD
+
+**Цель этапа:**  
+Настроить автоматическую сборку Docker-образа и деплой приложения при изменении кода, а также автоматизировать применение конфигурации Terraform через CI/CD-систему.
+
+**Выбранная CI/CD-система:** **GitHub Actions** (альтернативный вариант из методички: вместо Terraform Cloud или Atlantis настроить автоматический запуск и применение конфигурации Terraform из git-репозитория в CI/CD-системе при любом комите в `main` ветку).
+
+**Используемые инструменты:**
+- **GitHub Actions** — CI/CD-система для автоматизации.
+- **Yandex Cloud CLI** — устанавливается динамически в раннере через `curl`.
+
+### 5.1. Пайплайн деплоя приложения (`ci-cd.yml`)
+
+**Необходимые секреты GitHub:**
+
+| Секрет | Описание |
+|--------|----------|
+| `YC_SA_KEY` | JSON ключ сервисного аккаунта |
+| `YC_FOLDER_ID` | ID каталога Yandex Cloud |
+| `YC_REGISTRY_ID` | ID Container Registry |
+| `YC_CLUSTER_ID` | ID Kubernetes кластера |
+
+**Триггер:** Push тега (например, `v1.0.0`).
+
+**Шаги пайплайна:**
+1. 📥 Checkout кода из репозитория.
+2. ️ Установка Yandex Cloud CLI через `curl`.
+3. 🔑 Аутентификация через сервисный ключ (`YC_SA_KEY`).
+4. 🐳 Настройка Docker для работы с Yandex Container Registry.
+5. ️ Сборка Docker-образа с тегом версии.
+6. 📤 Push образа в Yandex Container Registry.
+7. 🔌 Получение credentials Kubernetes кластера.
+8.  Обновление манифеста `deployment.yaml` (замена тега образа).
+9. 🚀 Деплой в Kubernetes через `kubectl apply`.
+
+### ✅ Результаты выполнения этапа
+
+- ✅ При создании тега происходит сборка, отправка образа в Registry и деплой в Kubernetes.
+- ✅ Интерфейс CI/CD (GitHub Actions) доступен и показывает выполнение пайплайнов.
+
+
+
+<img width="1413" height="409" alt="Скриншот 27-09-2026 164852" src="https://github.com/user-attachments/assets/f2efd2b3-8904-4d48-8e43-1c6cb631e7ba" />
+
+
+
+
+
+
+
