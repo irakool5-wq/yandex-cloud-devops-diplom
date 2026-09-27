@@ -187,7 +187,7 @@ terraform {
     skip_credentials_validation = true
   }
 }
-
+```
 
 ### 1.3. Сетевая инфраструктура (VPC)
 
