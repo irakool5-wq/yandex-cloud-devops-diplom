@@ -174,7 +174,7 @@
 Создан сервисный аккаунт `terraform`.
 
 ### 1.2. Конфигурация Backend
-Для хранения состояния Terraform настроен S3-совместимый backend в файле `infra/backend.tf`:
+Для хранения состояния Terraform настроен S3-совместимый backend в файле `infra/backend.tf`
 ```hcl
 terraform {
   backend "s3" {
