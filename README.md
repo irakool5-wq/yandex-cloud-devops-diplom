@@ -373,10 +373,13 @@ helm install prometheus prometheus-community/kube-prometheus-stack \
 
 - ✅ При создании тега происходит сборка, отправка образа в Registry и деплой в Kubernetes.
 - ✅ Интерфейс CI/CD (GitHub Actions) доступен и показывает выполнение пайплайнов.
+- ✅ Приложение доступно.
+
+<img width="1413" height="409" alt="Скриншот 27-09-2026 164852" src="https://github.com/user-attachments/assets/25b769df-b61a-4121-88c6-f602aba22aa2" />
 
 
+<img width="1574" height="833" alt="Скриншот 27-09-2026 145546" src="https://github.com/user-attachments/assets/47d0f6cc-168d-40ba-b1a0-78b0145920e1" />
 
-<img width="1548" height="771" alt="Скриншот 27-09-2026 165105" src="https://github.com/user-attachments/assets/a781792e-1418-4b2a-b17a-1f374af29446" />
 
 
 
