@@ -373,7 +373,8 @@ helm install prometheus prometheus-community/kube-prometheus-stack \
 
 
 
-<img width="1413" height="409" alt="Скриншот 27-09-2026 164852" src="https://github.com/user-attachments/assets/f2efd2b3-8904-4d48-8e43-1c6cb631e7ba" />
+<img width="1548" height="771" alt="Скриншот 27-09-2026 165105" src="https://github.com/user-attachments/assets/a781792e-1418-4b2a-b17a-1f374af29446" />
+
 
 
 
