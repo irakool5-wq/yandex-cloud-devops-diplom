@@ -42,13 +42,14 @@ resource "yandex_kubernetes_node_group" "diploma_k8s_ng" {
     }
 
     network_interface {
-      subnet_ids = [
-        yandex_vpc_subnet.public[var.zones[0]].id,
-        yandex_vpc_subnet.public[var.zones[1]].id,
-        yandex_vpc_subnet.public[var.zones[2]].id
-      ]
-      nat = true
-    }
+        ipv4 = true
+        nat = true
+        subnet_ids = [
+          yandex_vpc_subnet.public["ru-central1-a"].id,
+          yandex_vpc_subnet.public["ru-central1-b"].id,
+          yandex_vpc_subnet.public["ru-central1-d"].id
+        ]
+      }
   }
 
   scale_policy {
