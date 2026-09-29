@@ -8,9 +8,20 @@ resource "yandex_kubernetes_cluster" "diploma_k8s" {
   folder_id   = var.folder_id
 
   master {
-    zonal {
-      zone      = var.zones[0]
-      subnet_id = yandex_vpc_subnet.public[var.zones[0]].id
+    regional {
+      region = "ru-central1"
+      location {
+        zone      = var.zones[0]
+        subnet_id = yandex_vpc_subnet.public[var.zones[0]].id
+      }
+      location {
+        zone      = var.zones[1]
+        subnet_id = yandex_vpc_subnet.public[var.zones[1]].id
+      }
+      location {
+        zone      = var.zones[2]
+        subnet_id = yandex_vpc_subnet.public[var.zones[2]].id
+      }
     }
     public_ip = true
   }
