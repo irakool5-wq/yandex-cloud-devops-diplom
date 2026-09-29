@@ -249,6 +249,46 @@ terraform {
 
 
 
+### 2.2 Правки по замечанию.
+
+Внесены правки в `infra/k8s.tf` в блоке `master`
+
+```
+ master {
+    regional {
+      region = "ru-central1"
+      location {
+        zone      = var.zones[0]
+        subnet_id = yandex_vpc_subnet.public[var.zones[0]].id
+      }
+      location {
+        zone      = var.zones[1]
+        subnet_id = yandex_vpc_subnet.public[var.zones[1]].id
+      }
+      location {
+        zone      = var.zones[2]
+        subnet_id = yandex_vpc_subnet.public[var.zones[2]].id
+      }
+    }
+    public_ip = true
+  }
+```
+
+
+✅ **Результаты выполнения:**
+
+- [x] Мастер находится в разных зонах.
+
+
+<img width="1807" height="180" alt="Скриншот 29-09-2026 191037" src="https://github.com/user-attachments/assets/dcbb1de8-ae5a-4614-8b67-e2e9b6d409b4" />
+
+<img width="1808" height="714" alt="Скриншот 29-09-2026 191101" src="https://github.com/user-attachments/assets/e42c3518-41d7-4206-9b3f-518554747711" />
+
+<img width="1813" height="113" alt="Скриншот 29-09-2026 191125" src="https://github.com/user-attachments/assets/6d56cea9-8fec-40d8-8be6-6b708e04ba1e" />
+
+
+
+
 
 ## 3. Создание тестового приложения
 
